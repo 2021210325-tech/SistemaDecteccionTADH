@@ -1,0 +1,777 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// SEGURIDAD
+// ==========================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  emailVerified DateTime? @map("email_verified")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastLoginAt   DateTime? @map("last_login_at")
+  isActive      Boolean   @default(true) @map("is_active")
+  avatarUrl     String?   @map("avatar_url")
+
+  // Relaciones
+  psychologist       Psychologist?
+  administrator      Administrator?
+  entityUser         EntityUser?
+  roles              UserRole[]
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  createdStudents    Student[]          @relation("StudentCreator")
+  createdEvaluations Evaluation[]       @relation("EvaluationCreator")
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  users            UserRole[]
+  rolePermissions  RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  module      String
+  action      String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  rolePermissions RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String   @map("role_id")
+  permissionId String   @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  action      String
+  module      String
+  recordId    String?  @map("record_id")
+  tableName   String?  @map("table_name")
+  oldValue    Json?    @map("old_value")
+  newValue    Json?    @map("new_value")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([module])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==========================================
+// GEOGRAFÍA
+// ==========================================
+
+model Region {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  provinces Province[]
+
+  @@map("regions")
+}
+
+model Province {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  regionId  String   @map("region_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  region    Region     @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  districts District[]
+
+  @@map("provinces")
+}
+
+model District {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  provinceId String   @map("province_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  province  Province           @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  ugels     Ugel[]
+  institutions EducationalInstitution[]
+
+  @@map("districts")
+}
+
+model Ugel {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  districtId String   @map("district_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  district     District                 @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  institutions EducationalInstitution[]
+
+  @@map("ugels")
+}
+
+// ==========================================
+// EDUCACIÓN
+// ==========================================
+
+model EducationalLevel {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  grades      Grade[]
+  institutions EducationalInstitution[]
+  currentStudents Student[]
+
+  @@map("educational_levels")
+}
+
+model Grade {
+  id        String   @id @default(cuid())
+  code      String
+  name      String
+  levelId   String   @map("level_id")
+  order     Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  level       EducationalLevel @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  sections    Section[]
+  enrollments StudentEnrollment[]
+  currentStudents Student[]
+
+  @@unique([levelId, code])
+  @@map("grades")
+}
+
+model Section {
+  id        String   @id @default(cuid())
+  name      String
+  gradeId   String   @map("grade_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  grade       Grade              @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  enrollments StudentEnrollment[]
+
+  @@map("sections")
+}
+
+model SchoolYear {
+  id        String   @id @default(cuid())
+  year      Int
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+  isActive  Boolean  @default(false) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  enrollments StudentEnrollment[]
+
+  @@map("school_years")
+}
+
+model EducationalInstitution {
+  id           String   @id @default(cuid())
+  modularCode  String   @unique @map("modular_code")
+  name         String
+  address      String?
+  districtId   String   @map("district_id")
+  ugelId       String?  @map("ugel_id")
+  levelId      String?  @map("level_id")
+  director     String?
+  phone        String?
+  email        String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  district    District           @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  ugel        Ugel?              @relation(fields: [ugelId], references: [id], onDelete: SetNull)
+  level       EducationalLevel?  @relation(fields: [levelId], references: [id], onDelete: SetNull)
+  students    Student[]
+  enrollments StudentEnrollment[]
+  psychologists Psychologist[]
+  appointments Appointment[]
+
+  @@map("educational_institutions")
+}
+
+// ==========================================
+// PERSONAL
+// ==========================================
+
+model Psychologist {
+  id              String    @id @default(cuid())
+  userId          String    @unique @map("user_id")
+  firstName       String    @map("first_name")
+  lastName        String    @map("last_name")
+  documentType    String?   @map("document_type")
+  documentNumber  String?   @map("document_number")
+  phone           String?
+  specialization  String?
+  licenseNumber   String?   @map("license_number")
+  institutionId   String?   @map("institution_id")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relaciones
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institution EducationalInstitution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  evaluations Evaluation[]
+  reports     PsychologicalReport[]
+  records     PsychologicalRecord[]
+  appointments Appointment[]
+  followUps   FollowUp[]
+
+  @@map("psychologists")
+}
+
+model Administrator {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  phone     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("administrators")
+}
+
+// ==========================================
+// ESTUDIANTES
+// ==========================================
+
+model Student {
+  id            String   @id @default(cuid())
+  code          String?  @unique
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  documentType  String?  @map("document_type")
+  documentNumber String? @map("document_number")
+  dateOfBirth   DateTime? @map("date_of_birth")
+  age           Int?
+  gender        String?
+  institutionId String   @map("institution_id")
+  currentLevelId String? @map("current_level_id")
+  currentGradeId String? @map("current_grade_id")
+  currentSection String? @map("current_section")
+  schoolYear    String?  @map("school_year")
+  guardianName  String?  @map("guardian_name")
+  guardianPhone String?  @map("guardian_phone")
+  guardianEmail String?  @map("guardian_email")
+  status        String   @default("active")
+  notes         String?
+  createdById   String?  @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  institution EducationalInstitution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  currentLevel EducationalLevel?     @relation(fields: [currentLevelId], references: [id], onDelete: SetNull)
+  currentGrade Grade?                @relation(fields: [currentGradeId], references: [id], onDelete: SetNull)
+  createdBy   User?                 @relation("StudentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  enrollments StudentEnrollment[]
+  guardians   StudentGuardian[]
+  evaluations Evaluation[]
+  consents    Consent[]
+  records     PsychologicalRecord[]
+  reports     PsychologicalReport[]
+  appointments Appointment[]
+  followUps   FollowUp[]
+
+  @@map("students")
+}
+
+model StudentEnrollment {
+  id            String   @id @default(cuid())
+  studentId     String   @map("student_id")
+  institutionId String   @map("institution_id")
+  gradeId       String   @map("grade_id")
+  sectionId     String?  @map("section_id")
+  schoolYearId  String   @map("school_year_id")
+  enrollmentDate DateTime @map("enrollment_date")
+  status        String   @default("active")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  student     Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  institution EducationalInstitution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  grade       Grade            @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  section     Section?         @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  schoolYear  SchoolYear       @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  @@map("student_enrollments")
+}
+
+model Guardian {
+  id            String   @id @default(cuid())
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  documentType  String?  @map("document_type")
+  documentNumber String? @map("document_number")
+  phone         String?
+  email         String?
+  occupation    String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  students StudentGuardian[]
+  consents Consent[]
+  appointments Appointment[]
+
+  @@map("guardians")
+}
+
+model StudentGuardian {
+  id          String   @id @default(cuid())
+  studentId   String   @map("student_id")
+  guardianId  String   @map("guardian_id")
+  relationship String
+  isPrimary   Boolean  @default(false) @map("is_primary")
+  hasAuthorization Boolean @default(false) @map("has_authorization")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, guardianId])
+  @@map("student_guardians")
+}
+
+model Consent {
+  id              String   @id @default(cuid())
+  studentId       String   @map("student_id")
+  guardianId      String?  @map("guardian_id")
+  consentVersion  String   @map("consent_version")
+  isAccepted      Boolean  @default(false) @map("is_accepted")
+  acceptedAt      DateTime? @map("accepted_at")
+  evidenceUrl     String?  @map("evidence_url")
+  registeredById  String?  @map("registered_by_id")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian Guardian? @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+
+  @@map("consents")
+}
+
+// ==========================================
+// EVALUACIONES
+// ==========================================
+
+model Test {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  author      String?
+  version     String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  versions    TestVersion[]
+  evaluations Evaluation[]
+
+  @@map("tests")
+}
+
+model TestVersion {
+  id        String   @id @default(cuid())
+  testId    String   @map("test_id")
+  version   String
+  isCurrent Boolean  @default(false) @map("is_current")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  test     Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
+  sections TestSection[]
+  evaluations Evaluation[]
+
+  @@unique([testId, version])
+  @@map("test_versions")
+}
+
+model TestSection {
+  id        String   @id @default(cuid())
+  versionId String   @map("version_id")
+  code      String
+  name      String
+  description String?
+  order     Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  version   TestVersion    @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  questions TestQuestion[]
+
+  @@map("test_sections")
+}
+
+model TestQuestion {
+  id          String   @id @default(cuid())
+  sectionId   String   @map("section_id")
+  code        String
+  text        String
+  description String?
+  order       Int
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  section  TestSection   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  options  TestOption[]
+  answers  EvaluationAnswer[]
+
+  @@map("test_questions")
+}
+
+model TestOption {
+  id          String   @id @default(cuid())
+  questionId  String   @map("question_id")
+  code        String
+  text        String
+  value       Int
+  score       Int      @default(0)
+  description String?
+  order       Int
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  question TestQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers  EvaluationAnswer[]
+
+  @@map("test_options")
+}
+
+model Evaluation {
+  id            String   @id @default(cuid())
+  studentId     String   @map("student_id")
+  testId        String   @map("test_id")
+  versionId     String?  @map("version_id")
+  psychologistId String? @map("psychologist_id")
+  createdById   String?  @map("created_by_id")
+  status        String   @default("pending")
+  scheduledDate DateTime? @map("scheduled_date")
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  totalScore    Int?
+  maxScore      Int?
+  percentage    Float?
+  observations  String?
+  recommendations String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  student     Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  test        Test            @relation(fields: [testId], references: [id], onDelete: Cascade)
+  version     TestVersion?    @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  psychologist Psychologist?  @relation(fields: [psychologistId], references: [id], onDelete: SetNull)
+  createdBy   User?           @relation("EvaluationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  answers     EvaluationAnswer[]
+  results     EvaluationResult[]
+  records     PsychologicalRecord[]
+  reports     PsychologicalReport[]
+  followUps   FollowUp[]
+
+  @@map("evaluations")
+}
+
+model EvaluationAnswer {
+  id            String   @id @default(cuid())
+  evaluationId  String   @map("evaluation_id")
+  questionId    String   @map("question_id")
+  optionId      String?  @map("option_id")
+  textAnswer    String?  @map("text_answer")
+  numericAnswer Int?     @map("numeric_answer")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  question   TestQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  option     TestOption?  @relation(fields: [optionId], references: [id], onDelete: SetNull)
+
+  @@map("evaluation_answers")
+}
+
+model EvaluationResult {
+  id            String   @id @default(cuid())
+  evaluationId  String   @map("evaluation_id")
+  category      String
+  score         Int
+  maxScore      Int      @map("max_score")
+  percentage    Float
+  indicators    Json?
+  interpretation String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@map("evaluation_results")
+}
+
+// ==========================================
+// PSICOLOGÍA
+// ==========================================
+
+model PsychologicalRecord {
+  id            String   @id @default(cuid())
+  studentId     String   @map("student_id")
+  evaluationId  String?  @map("evaluation_id")
+  psychologistId String? @map("psychologist_id")
+  recordType    String   @map("record_type")
+  title         String
+  content       String?
+  observations  String?
+  isConfidential Boolean @default(true) @map("is_confidential")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  evaluation  Evaluation?  @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+  psychologist Psychologist? @relation(fields: [psychologistId], references: [id], onDelete: SetNull)
+
+  @@map("psychological_records")
+}
+
+model PsychologicalReport {
+  id            String   @id @default(cuid())
+  studentId     String   @map("student_id")
+  evaluationId  String?  @map("evaluation_id")
+  psychologistId String  @map("psychologist_id")
+  title         String
+  content       String?
+  observations  String?
+  recommendations String?
+  status        String   @default("draft")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdById   String?  @map("created_by_id")
+  updatedById   String?  @map("updated_by_id")
+
+  // Relaciones
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  evaluation  Evaluation?  @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+  psychologist Psychologist @relation(fields: [psychologistId], references: [id], onDelete: Cascade)
+  files       PsychologicalReportFile[]
+
+  @@map("psychological_reports")
+}
+
+model PsychologicalReportFile {
+  id          String   @id @default(cuid())
+  reportId    String   @map("report_id")
+  fileName    String   @map("file_name")
+  fileUrl     String   @map("file_url")
+  fileSize    Int?     @map("file_size")
+  fileType    String   @map("file_type")
+  uploadedAt  DateTime @default(now()) @map("uploaded_at")
+  uploadedById String? @map("uploaded_by_id")
+
+  // Relaciones
+  report PsychologicalReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("psychological_report_files")
+}
+
+model FollowUp {
+  id            String   @id @default(cuid())
+  studentId     String   @map("student_id")
+  evaluationId  String?  @map("evaluation_id")
+  psychologistId String  @map("psychologist_id")
+  followUpType  String   @map("follow_up_type")
+  title         String
+  description   String?
+  nextFollowUp  DateTime? @map("next_follow_up")
+  status        String   @default("pending")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  evaluation  Evaluation?  @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+  psychologist Psychologist @relation(fields: [psychologistId], references: [id], onDelete: Cascade)
+
+  @@map("follow_ups")
+}
+
+// ==========================================
+// CITAS
+// ==========================================
+
+model Appointment {
+  id            String   @id @default(cuid())
+  studentId     String   @map("student_id")
+  psychologistId String  @map("psychologist_id")
+  guardianId    String?  @map("guardian_id")
+  institutionId String?  @map("institution_id")
+  appointmentDate DateTime @map("appointment_date")
+  startTime     DateTime @map("start_time")
+  endTime       DateTime @map("end_time")
+  modality      String   @default("in_person")
+  reason        String?
+  status        String   @default("pending")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  student     Student                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  psychologist Psychologist           @relation(fields: [psychologistId], references: [id], onDelete: Cascade)
+  guardian     Guardian?               @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+  institution EducationalInstitution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  @@map("appointments")
+}
+
+// ==========================================
+// ENTIDADES GUBERNAMENTALES
+// ==========================================
+
+model GovernmentEntity {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  code        String   @unique
+  level       String
+  regionId    String?  @map("region_id")
+  provinceId  String?  @map("province_id")
+  districtId  String?  @map("district_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  users EntityUser[]
+
+  @@map("government_entities")
+}
+
+model EntityUser {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  entityId    String   @map("entity_id")
+  position    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entity GovernmentEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@map("entity_users")
+}
+
+// ==========================================
+// SISTEMA
+// ==========================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  title       String
+  message     String
+  type        String
+  isRead      Boolean  @default(false) @map("is_read")
+  link        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      String   @default("string")
+  category  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}

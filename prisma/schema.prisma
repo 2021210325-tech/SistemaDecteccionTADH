@@ -442,7 +442,9 @@ model Test {
   name        String
   description String?
   author      String?
-  version     String?
+  population  String?  // "children", "adolescents", "adults"
+  minAge      Int?     @map("min_age")
+  maxAge      Int?     @map("max_age")
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -455,19 +457,99 @@ model Test {
 }
 
 model TestVersion {
-  id        String   @id @default(cuid())
-  testId    String   @map("test_id")
-  version   String
-  isCurrent Boolean  @default(false) @map("is_current")
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String   @id @default(cuid())
+  testId      String   @map("test_id")
+  version     String
+  description String?
+  releaseDate DateTime? @map("release_date")
+  isCurrent   Boolean  @default(false) @map("is_current")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   // Relaciones
-  test     Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
-  sections TestSection[]
+  test        Test           @relation(fields: [testId], references: [id], onDelete: Cascade)
+  parts       TestPart[]
+  sections    TestSection[]
   evaluations Evaluation[]
 
   @@unique([testId, version])
   @@map("test_versions")
+}
+
+model TestPart {
+  id          String   @id @default(cuid())
+  versionId   String   @map("version_id")
+  code        String
+  name        String
+  description String?
+  order       Int
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  version  TestVersion  @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  domains  TestDomain[]
+
+  @@map("test_parts")
+}
+
+model TestDomain {
+  id          String   @id @default(cuid())
+  partId      String   @map("part_id")
+  code        String
+  name        String
+  description String?
+  order       Int
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  part       TestPart       @relation(fields: [partId], references: [id], onDelete: Cascade)
+  criteria   TestCriterion[]
+
+  @@map("test_domains")
+}
+
+model TestCriterion {
+  id           String   @id @default(cuid())
+  domainId     String   @map("domain_id")
+  code         String
+  number       Int
+  name         String
+  officialText String   @map("official_text")
+  description  String?
+  order        Int
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  domain     TestDomain     @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  questions  TestQuestion[]
+
+  @@map("test_criteria")
+}
+
+model TestQuestion {
+  id                 String   @id @default(cuid())
+  criterionId        String?  @map("criterion_id")
+  sectionId          String?  @map("section_id")
+  code               String
+  context            String?  @default("GENERAL") // CURRENT, CHILDHOOD, GENERAL
+  text               String
+  description        String?
+  questionType       String   @default("SINGLE_CHOICE") @map("question_type")
+  required           Boolean  @default(true)
+  allowsExamples     Boolean  @default(false) @map("allows_examples")
+  allowsObservation  Boolean  @default(true) @map("allows_observation")
+  order              Int
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  criterion  TestCriterion?  @relation(fields: [criterionId], references: [id], onDelete: SetNull)
+  section    TestSection?    @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  options    TestOption[]
+  examples   TestExample[]
+  answers    EvaluationAnswer[]
+  observations EvaluationObservation[]
+
+  @@map("test_questions")
 }
 
 model TestSection {
@@ -486,21 +568,20 @@ model TestSection {
   @@map("test_sections")
 }
 
-model TestQuestion {
+model TestExample {
   id          String   @id @default(cuid())
-  sectionId   String   @map("section_id")
-  code        String
+  questionId  String   @map("question_id")
   text        String
-  description String?
+  value       String?
+  score       Int      @default(0)
   order       Int
   createdAt   DateTime @default(now()) @map("created_at")
 
   // Relaciones
-  section  TestSection   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  options  TestOption[]
-  answers  EvaluationAnswer[]
+  question TestQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers  EvaluationAnswerExample[]
 
-  @@map("test_questions")
+  @@map("test_examples")
 }
 
 model TestOption {
@@ -522,23 +603,26 @@ model TestOption {
 }
 
 model Evaluation {
-  id            String   @id @default(cuid())
-  studentId     String   @map("student_id")
-  testId        String   @map("test_id")
-  versionId     String?  @map("version_id")
-  psychologistId String? @map("psychologist_id")
-  createdById   String?  @map("created_by_id")
-  status        String   @default("pending")
-  scheduledDate DateTime? @map("scheduled_date")
-  startedAt     DateTime? @map("started_at")
-  completedAt   DateTime? @map("completed_at")
-  totalScore    Int?
-  maxScore      Int?
-  percentage    Float?
-  observations  String?
+  id              String    @id @default(cuid())
+  studentId       String    @map("student_id")
+  testId          String    @map("test_id")
+  versionId       String?   @map("version_id")
+  psychologistId  String?   @map("psychologist_id")
+  createdById     String?   @map("created_by_id")
+  status          String    @default("pending") // draft, in_progress, completed, reviewed, approved, cancelled
+  scheduledDate   DateTime? @map("scheduled_date")
+  startedAt       DateTime? @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  reviewedAt      DateTime? @map("reviewed_at")
+  approvedAt      DateTime? @map("approved_at")
+  totalScore      Int?
+  maxScore        Int?
+  percentage      Float?
+  observations    String?
   recommendations String?
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  professionalConclusion String? @map("professional_conclusion")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Relaciones
   student     Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -547,10 +631,13 @@ model Evaluation {
   psychologist Psychologist?  @relation(fields: [psychologistId], references: [id], onDelete: SetNull)
   createdBy   User?           @relation("EvaluationCreator", fields: [createdById], references: [id], onDelete: SetNull)
   answers     EvaluationAnswer[]
+  answerExamples EvaluationAnswerExample[]
+  observationsList EvaluationObservation[]
   results     EvaluationResult[]
   records     PsychologicalRecord[]
   reports     PsychologicalReport[]
   followUps   FollowUp[]
+  collateralInfo CollateralInformation[]
 
   @@map("evaluations")
 }
@@ -562,31 +649,112 @@ model EvaluationAnswer {
   optionId      String?  @map("option_id")
   textAnswer    String?  @map("text_answer")
   numericAnswer Int?     @map("numeric_answer")
+  booleanValue  Boolean? @map("boolean_value")
+  score         Int?
+  createdById   String?  @map("created_by_id")
   createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relaciones
   evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
   question   TestQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
   option     TestOption?  @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  examples   EvaluationAnswerExample[]
 
+  @@unique([evaluationId, questionId])
   @@map("evaluation_answers")
 }
 
+model EvaluationAnswerExample {
+  id         String   @id @default(cuid())
+  evaluationId String @map("evaluation_id")
+  answerId   String   @map("answer_id")
+  exampleId  String   @map("example_id")
+  selected   Boolean  @default(false)
+  observation String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  evaluation Evaluation    @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  answer     EvaluationAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  example    TestExample      @relation(fields: [exampleId], references: [id], onDelete: Cascade)
+
+  @@unique([answerId, exampleId])
+  @@map("evaluation_answer_examples")
+}
+
+model EvaluationObservation {
+  id           String   @id @default(cuid())
+  evaluationId String   @map("evaluation_id")
+  questionId   String?  @map("question_id")
+  context      String?  // CURRENT, CHILDHOOD, GENERAL
+  observation  String
+  createdById  String?  @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  question   TestQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@map("evaluation_observations")
+}
+
 model EvaluationResult {
-  id            String   @id @default(cuid())
-  evaluationId  String   @map("evaluation_id")
-  category      String
-  score         Int
-  maxScore      Int      @map("max_score")
-  percentage    Float
-  indicators    Json?
-  interpretation String?
-  createdAt     DateTime @default(now()) @map("created_at")
+  id                     String   @id @default(cuid())
+  evaluationId           String   @map("evaluation_id")
+  inattentionChildhood   Int      @default(0) @map("inattention_childhood")
+  inattentionCurrent     Int      @default(0) @map("inattention_current")
+  hyperactivityChildhood Int      @default(0) @map("hyperactivity_childhood")
+  hyperactivityCurrent   Int      @default(0) @map("hyperactivity_current")
+  criteriaB              Boolean? @map("criteria_b")
+  criteriaC              Boolean? @map("criteria_c")
+  criteriaD              Boolean? @map("criteria_d")
+  criteriaE              Boolean? @map("criteria_e")
+  dysfunctionChildhood   Json?    @map("dysfunction_childhood")
+  dysfunctionCurrent     Json?    @map("dysfunction_current")
+  overallResult          String?  @map("overall_result")
+  interpretation         String?
+  createdAt              DateTime @default(now()) @map("created_at")
 
   // Relaciones
   evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
 
+  @@unique([evaluationId])
   @@map("evaluation_results")
+}
+
+model CollateralSource {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  information CollateralInformation[]
+
+  @@map("collateral_sources")
+}
+
+model CollateralInformation {
+  id              String   @id @default(cuid())
+  evaluationId    String   @map("evaluation_id")
+  sourceId        String   @map("source_id")
+  sourceName      String?  @map("source_name")
+  relationship    String?
+  informationDate DateTime? @map("information_date")
+  content         String
+  observations    String?
+  supportLevel    String?  @map("support_level")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  evaluation Evaluation    @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  source     CollateralSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@map("collateral_information")
 }
 
 // ==========================================

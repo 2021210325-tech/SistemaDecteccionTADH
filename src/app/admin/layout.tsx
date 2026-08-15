@@ -28,6 +28,7 @@ const sidebarNavItems = [
   { title: "Psicólogos", href: "/admin/psicologos", icon: Users },
   { title: "Estudiantes", href: "/admin/estudiantes", icon: GraduationCap },
   { title: "Instituciones", href: "/admin/instituciones", icon: Building2 },
+  { title: "Pruebas", href: "/admin/pruebas", icon: FileText },
   { title: "Evaluaciones", href: "/admin/evaluaciones", icon: FileText },
   { title: "Estadísticas", href: "/admin/estadisticas", icon: BarChart3 },
   { title: "Auditoría", href: "/admin/auditoria", icon: Shield },

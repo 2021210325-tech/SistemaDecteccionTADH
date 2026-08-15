@@ -93,6 +93,11 @@ export async function PUT(
         updateParams.push(percentage)
         paramIdx++
       }
+      if (hasSymptoms !== undefined) {
+        updateQuery += `, "has_symptoms" = $${paramIdx}`
+        updateParams.push(hasSymptoms)
+        paramIdx++
+      }
 
       updateQuery += ` WHERE id = $${paramIdx}`
       updateParams.push(id)

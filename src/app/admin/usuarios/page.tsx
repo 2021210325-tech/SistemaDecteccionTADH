@@ -316,7 +316,7 @@ export default function UsersPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">Rol *</Label>
-              <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
+              <Select value={formData.role ?? ""} onValueChange={(v) => setFormData({ ...formData, role: v ?? "" })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {ROLES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
@@ -378,7 +378,7 @@ export default function UsersPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">Rol</Label>
-              <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
+              <Select value={formData.role ?? ""} onValueChange={(v) => setFormData({ ...formData, role: v ?? "" })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {ROLES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}

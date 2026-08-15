@@ -22,6 +22,7 @@ import { signOut } from "@/lib/auth"
 const sidebarNavItems = [
   { title: "Dashboard", href: "/psicologo", icon: LayoutDashboard },
   { title: "Mis Estudiantes", href: "/psicologo/estudiantes", icon: Users },
+  { title: "Pruebas", href: "/psicologo/pruebas", icon: FileText },
   { title: "Evaluaciones", href: "/psicologo/evaluaciones", icon: FileText },
   { title: "Informes", href: "/psicologo/informes", icon: FileText },
   { title: "Citas", href: "/psicologo/citas", icon: Calendar },

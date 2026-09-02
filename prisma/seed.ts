@@ -71,7 +71,7 @@ async function main() {
 
   // Test DIVA
   const test = await prisma.test.create({
-    data: { code: 'DIVA', name: 'DIVA 2.0', description: 'Entrevista diagnóstica para TDAH', author: 'Jan Buitelaar', version: '2.0' },
+    data: { code: 'DIVA', name: 'DIVA 2.0', description: 'Entrevista diagnóstica para TDAH', author: 'Jan Buitelaar' },
   })
   const testVersion = await prisma.testVersion.create({ data: { testId: test.id, version: '2.0', isCurrent: true } })
 

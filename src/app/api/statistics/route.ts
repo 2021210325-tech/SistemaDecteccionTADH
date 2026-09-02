@@ -76,11 +76,7 @@ export async function GET(request: Request) {
         evaluation: {
           status: "completed",
         },
-        OR: [
-          { category: "inattention" },
-          { category: "hyperactivity" },
-          { category: "combined" },
-        ],
+        overallResult: { not: "No cumple criterios" },
       },
     })
 
